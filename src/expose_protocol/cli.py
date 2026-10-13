@@ -6,6 +6,7 @@ import sys
 
 from .definitions import has_control, load_protocol
 from .errors import LaunchError, ProtocolError, RequestError
+from .launchers import launch
 from .urls import make_url, prepare
 
 
@@ -14,11 +15,15 @@ def parser() -> argparse.ArgumentParser:
     commands = root.add_subparsers(dest="command", required=True)
     for name, help_text in (("validate", "Validate a local TOML definition."),
                             ("inspect", "Print a resolved invocation without launching."),
-                            ("link", "Build a percent-encoded URL or Markdown link.")):
+                            ("link", "Build a percent-encoded URL or Markdown link."),
+                            ("run", "Confirm and launch a validated URL.")):
         command = commands.add_parser(name, help=help_text)
         command.add_argument("--config", required=True, help="Explicit trusted TOML definition.")
-        if name == "inspect":
+        if name in {"inspect", "run"}:
             command.add_argument("url")
+        if name == "run":
+            command.add_argument("--dry-run", action="store_true", help="Print the resolved invocation without launching.")
+            command.add_argument("--yes", action="store_true", help="Explicitly bypass CLI confirmation.")
         if name == "link":
             command.add_argument("values", nargs="*", metavar="NAME=VALUE")
             command.add_argument("--markdown", metavar="LABEL")
@@ -43,6 +48,11 @@ def main(argv: list[str] | None = None) -> None:
             print(json.dumps(protocol.to_mapping(), indent=2, ensure_ascii=True))
         elif args.command == "inspect":
             print(json.dumps(prepare(protocol, args.url).to_mapping(), indent=2, ensure_ascii=True))
+        elif args.command == "run":
+            if args.dry_run:
+                print(json.dumps(prepare(protocol, args.url).to_mapping(), indent=2, ensure_ascii=True))
+            else:
+                raise SystemExit(launch(protocol, args.url, yes=args.yes))
         elif args.command == "link":
             url = make_url(protocol, _link_values(args.values))
             if args.markdown is not None:

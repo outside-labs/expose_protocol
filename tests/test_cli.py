@@ -57,6 +57,20 @@ class CLITests(ProtocolTestCase):
         self.assertFalse(output)
         self.assertNotIn("Traceback", error)
 
+    def test_dry_run_never_confirms_or_launches(self):
+        with patch("expose_protocol.cli.launch") as launch:
+            code, output, error = self.invoke("run", "--config", str(self.config),
+                                               "test-editor://open?file=README.md", "--dry-run")
+            self.assertEqual(code, 0, error)
+            self.assertEqual(json.loads(output)["cwd"], str(self.root))
+            launch.assert_not_called()
+
+    def test_run_propagates_exit_code_and_yes(self):
+        with patch("expose_protocol.cli.launch", return_value=7) as launch:
+            self.assertEqual(self.invoke("run", "--config", str(self.config),
+                                          "test-editor://open?file=README.md", "--yes")[0], 7)
+            self.assertTrue(launch.call_args.kwargs["yes"])
+
     def test_module_launcher_from_outside_checkout(self):
         env = os.environ | {"PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src")}
         result = subprocess.run([sys.executable, "-m", "expose_protocol", "link", "--config", str(self.config),

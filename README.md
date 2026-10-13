@@ -41,6 +41,22 @@ executable is a fixed absolute path, and relative roots resolve beside the
 definition. Definitions are trusted local configuration, and validation does
 not sandbox the chosen program or secure a hostile local filesystem.
 
+Launch from the CLI:
+
+```sh
+uv run expose-protocol run --config vim.toml 'vim://open?file=README.md' --dry-run
+uv run expose-protocol run --config vim.toml 'vim://open?file=README.md'
+```
+
+`run` shows the resolved argv and working directory and asks for confirmation.
+`--yes` explicitly bypasses the CLI prompt. GUI URL launches always ask for
+confirmation. Invalid requests and cancelled prompts launch nothing.
+Direct mode runs an argv list without a shell and returns the child's exit
+status. Terminal mode opens a fresh macOS Terminal window with shell-quoted
+arguments; its exit status reports submission of the session. Terminal's
+configured shell must accept POSIX shell quoting. macOS may request permission
+to automate Terminal on the first Terminal launch.
+
 Development:
 
 ```sh
