@@ -118,7 +118,9 @@ runtime paths disappear, allowing removal of a broken installation.
 `install(protocol, *, directory=None, replace=False, takeover=False)` builds,
 registers and selects a per-user handler in `~/Applications/Expose Protocol`.
 The alternate directory must be owned by the user and have no symlink path
-components. Foreign handlers require `takeover=True`; updates require
+components. Choose a persistent Applications location: native testing found
+that macOS declined routing from temporary storage, which triggers rollback.
+Foreign handlers require `takeover=True`; updates require
 `replace=True`. App/receipt identities and signatures are checked, and the
 previous app is retained until verified routing selects the intended app.
 Routing verification includes a bounded wait for Launch Services. On failure,

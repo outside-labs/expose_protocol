@@ -88,7 +88,8 @@ uv run expose-protocol uninstall vim
 
 Installation builds into `~/Applications/Expose Protocol`, registers the app
 and selects it for the custom scheme. `--apps-dir` chooses another owned
-directory. An existing different handler requires explicit `--takeover`;
+directory; use a persistent Applications location, since macOS can decline
+routing from temporary storage. An existing different handler requires explicit `--takeover`;
 installation records its bundle identifier for restoration on removal.
 Updates require `--replace`, verify the existing app and receipt, and preserve
 the previous app until registration succeeds. Failed updates restore the old
