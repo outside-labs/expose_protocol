@@ -6,12 +6,33 @@ import os
 from pathlib import Path
 import shutil
 import tempfile
+import time
 
 from .definitions import Protocol, has_control, validate_scheme
 from .errors import DefinitionError, LaunchError, ProtocolError
 from .launchers import require_macos
 from .macos import BUNDLE_FORMAT, app_scheme, build_app, bundle_identifier, run_native
 from .services import get_handler, register_app, set_handler, unregister_app
+
+
+def _same_app(selected: Path | None, app: Path) -> bool:
+    if selected is None:
+        return False
+    try:
+        return selected.samefile(app)
+    except OSError:
+        return False
+
+
+def _verify_selection(scheme: str, identifier: str, app: Path) -> None:
+    # Launch Services can publish routing after registration returns.
+    for delay in (0, 0.05, 0.1, 0.2, 0.4, 0.8, 1.6):
+        if delay:
+            time.sleep(delay)
+        selected = get_handler(scheme)
+        if selected.bundle_id == identifier and _same_app(selected.path, app):
+            return
+    raise LaunchError(f"macOS did not select {app}; returned handler {selected.bundle_id!r} at {selected.path}. Check for another copy of this handler.")
 
 
 def application_directory(directory: str | Path | None = None, *, create: bool = False) -> Path:
@@ -83,7 +104,7 @@ def install(protocol: Protocol, *, directory: str | Path | None = None,
             raise DefinitionError("orphaned or symlinked installation receipt; inspect it before proceeding")
         old_receipt = _managed(app, receipt, scheme) if exists else None
         original = get_handler(scheme)
-        foreign = (original.bundle_id is not None or original.path is not None) and (original.bundle_id != identifier or original.path != app)
+        foreign = (original.bundle_id is not None or original.path is not None) and (original.bundle_id != identifier or not _same_app(original.path, app))
         if foreign and not takeover:
             raise LaunchError(f"scheme already has a handler ({original.bundle_id or original.path}); use --takeover to explicitly replace it")
         previous = original.bundle_id if foreign else (old_receipt["previous_handler"] if old_receipt else original.bundle_id)
@@ -111,9 +132,7 @@ def install(protocol: Protocol, *, directory: str | Path | None = None,
             registration_attempted = True
             register_app(app)
             set_handler(scheme, identifier)
-            selected = get_handler(scheme)
-            if selected.bundle_id != identifier or selected.path != app:
-                raise LaunchError("macOS did not select this application; check for another copy of the same handler")
+            _verify_selection(scheme, identifier, app)
         except (OSError, ProtocolError) as exc:
             failures = []
             def recover(operation):

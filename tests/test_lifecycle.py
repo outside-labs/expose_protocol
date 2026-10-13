@@ -7,7 +7,7 @@ from unittest.mock import patch
 import uuid
 
 from expose_protocol import DefinitionError, LaunchError, install, uninstall
-from expose_protocol.lifecycle import application_directory
+from expose_protocol.lifecycle import _same_app
 from expose_protocol.macos import bundle_identifier, app_scheme
 from expose_protocol.services import DefaultHandler, get_handler, register_app, unregister_app, LSREGISTER
 from support import ProtocolTestCase
@@ -90,6 +90,29 @@ class LifecycleTests(ProtocolTestCase):
         self.assertEqual(manifest["protocol"]["action"], "open")
         self.assertEqual(self.handler, DefaultHandler(bundle_identifier("test-editor"), self.app))
         self.assertFalse(list(self.apps.glob(".expose-protocol-*")))
+
+    def test_delayed_routing_is_checked_before_installation_succeeds(self):
+        expected = DefaultHandler(bundle_identifier("test-editor"), self.app)
+        with patch("expose_protocol.lifecycle.get_handler", side_effect=[DefaultHandler(),
+                DefaultHandler(expected.bundle_id), expected]), patch("expose_protocol.lifecycle.time.sleep") as sleep:
+            self.assertEqual(install(self.protocol(), directory=self.apps), self.app)
+            sleep.assert_called_once_with(0.05)
+
+    def test_selection_failure_restores_previous_files(self):
+        install(self.protocol(), directory=self.apps)
+        original = self.receipt.read_bytes()
+        with patch("expose_protocol.lifecycle.get_handler", side_effect=[self.handler] + [DefaultHandler()] * 7), patch(
+                "expose_protocol.lifecycle.time.sleep"), self.assertRaises(LaunchError) as error:
+            install(self.protocol(action="edit"), directory=self.apps, replace=True)
+        self.assertIn("returned handler", str(error.exception))
+        self.assertEqual(self.receipt.read_bytes(), original)
+
+    def test_filesystem_identity_accepts_an_alias_for_the_same_app(self):
+        install(self.protocol(), directory=self.apps)
+        alias = self.root / "Alias.app"
+        alias.symlink_to(self.app, target_is_directory=True)
+        self.assertTrue(_same_app(alias, self.app))
+        self.assertFalse(_same_app(self.root / "Other.app", self.app))
 
     def test_failed_new_install_removes_generated_files_and_restores_default(self):
         self.handler = DefaultHandler("org.example.foreign", self.root / "Foreign.app")
