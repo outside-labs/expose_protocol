@@ -71,6 +71,20 @@ class CLITests(ProtocolTestCase):
                                           "test-editor://open?file=README.md", "--yes")[0], 7)
             self.assertTrue(launch.call_args.kwargs["yes"])
 
+    def test_install_passes_explicit_update_and_takeover(self):
+        with patch("expose_protocol.cli.install", return_value=self.root / "App.app") as install:
+            code, _, error = self.invoke("install", "--config", str(self.config), "--replace", "--takeover",
+                                           "--apps-dir", str(self.root))
+            self.assertEqual(code, 0, error)
+            self.assertEqual(install.call_args.kwargs, {"directory": str(self.root), "replace": True, "takeover": True})
+
+    def test_uninstall_does_not_require_current_definition(self):
+        with patch("expose_protocol.cli.uninstall", return_value=self.root / "App.app") as remove, patch(
+                "expose_protocol.cli.load_protocol") as load:
+            self.assertEqual(self.invoke("uninstall", "test-editor")[0], 0)
+            remove.assert_called_once_with("test-editor", directory=None)
+            load.assert_not_called()
+
     def test_module_launcher_from_outside_checkout(self):
         env = os.environ | {"PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src")}
         result = subprocess.run([sys.executable, "-m", "expose_protocol", "link", "--config", str(self.config),

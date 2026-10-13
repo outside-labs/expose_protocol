@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 
-from .definitions import MAX_DEFINITION_BYTES, Protocol, has_control, protocol_from_mapping
+from .definitions import MAX_DEFINITION_BYTES, Protocol, has_control, protocol_from_mapping, validate_scheme
 from .errors import DefinitionError, LaunchError, ProtocolError, RequestError
 from .launchers import launch, require_macos
 
@@ -70,8 +70,7 @@ def run_native(argv: list[str]) -> str:
     return result.stdout.strip()
 
 
-def load_manifest(path: Path) -> tuple[Protocol, Path]:
-    """Load a generated snapshot and validate it again before each launch."""
+def _manifest_data(path: Path) -> dict:
     try:
         raw = path.read_bytes()
         if len(raw) > MAX_DEFINITION_BYTES:
@@ -83,12 +82,25 @@ def load_manifest(path: Path) -> tuple[Protocol, Path]:
         python = data["python"]
         if not isinstance(python, str) or has_control(python) or not Path(python).is_absolute():
             raise DefinitionError("bundle interpreter must be an absolute path")
-        interpreter = Path(python).resolve(strict=True)
+        if (not isinstance(data["protocol"], dict) or type(data["protocol"].get("schema")) is not int
+                or data["protocol"]["schema"] != 1):
+            raise DefinitionError("unsupported protocol snapshot")
+        validate_scheme(data["protocol"].get("scheme"))
+        return data
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise DefinitionError(f"cannot read bundle manifest: {exc}") from exc
+
+
+def load_manifest(path: Path) -> tuple[Protocol, Path]:
+    """Validate runtime paths again before a launch, using the pinned snapshot."""
+    data = _manifest_data(path)
+    try:
+        interpreter = Path(data["python"]).resolve(strict=True)
         if not interpreter.is_file() or not os.access(interpreter, os.X_OK):
             raise DefinitionError("bundle interpreter must be an executable file")
         return protocol_from_mapping(data["protocol"], base=path.parent), interpreter
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise DefinitionError(f"cannot read bundle manifest: {exc}") from exc
+    except OSError as exc:
+        raise DefinitionError(f"cannot use bundle runtime: {exc}") from exc
 
 
 def bundle_main(manifest: Path, arguments: list[str]) -> None:
@@ -105,8 +117,8 @@ def bundle_main(manifest: Path, arguments: list[str]) -> None:
         raise SystemExit(1 if isinstance(exc, LaunchError) else 2) from None
 
 
-def inspect_app(path: str | Path) -> Protocol:
-    """Recognize a generated app by its layout, snapshot and matching identity."""
+def app_scheme(path: str | Path) -> str:
+    """Recognize identity even after a root or interpreter has been removed."""
     path = Path(path)
     if path.is_symlink() or not path.is_dir() or path.suffix != ".app":
         raise DefinitionError("expected a generated application directory without symlinks")
@@ -117,23 +129,31 @@ def inspect_app(path: str | Path) -> Protocol:
             info = plistlib.load(stream)
         if not isinstance(info, dict):
             raise DefinitionError("application plist must be a dictionary")
-        protocol, _ = load_manifest(path / "Contents/Resources/manifest.json")
-        identifier = bundle_identifier(protocol.scheme)
-        expected_types = [{"CFBundleTypeRole": "Shell", "CFBundleURLName": identifier,
-                           "CFBundleURLSchemes": [protocol.scheme]}]
+        manifest = _manifest_data(path / "Contents/Resources/manifest.json")
+        scheme = manifest["protocol"]["scheme"]
+        identifier = bundle_identifier(scheme)
+        expected_types = [[{"CFBundleTypeRole": role, "CFBundleURLName": identifier,
+                            "CFBundleURLSchemes": [scheme]}] for role in ("Viewer", "Shell")]
         if (type(info.get("ExposeProtocolSchema")) is not int
                 or info.get("ExposeProtocolSchema") != BUNDLE_FORMAT
                 or info.get("CFBundleIdentifier") != identifier
-                or info.get("CFBundleURLTypes") != expected_types
+                or info.get("CFBundleURLTypes") not in expected_types
                 or info.get("CFBundleExecutable") != "applet"
                 or not (path / "Contents/MacOS/applet").is_file()
                 or (path / "Contents/Resources/launcher.py").read_text(encoding="utf-8") != APP_HELPER):
             raise DefinitionError("application identity or helper does not match its manifest")
-        return protocol
+        return scheme
     except (OSError, ValueError, TypeError, plistlib.InvalidFileException) as exc:
         if isinstance(exc, DefinitionError):
             raise
         raise DefinitionError(f"cannot inspect generated application: {exc}") from exc
+
+
+def inspect_app(path: str | Path) -> Protocol:
+    """Inspect identity and the currently usable runtime definition."""
+    app_scheme(path)
+    protocol, _ = load_manifest(Path(path) / "Contents/Resources/manifest.json")
+    return protocol
 
 
 def build_app(protocol: Protocol, output: str | Path) -> Path:
@@ -167,7 +187,7 @@ def build_app(protocol: Protocol, output: str | Path) -> Path:
             identifier = bundle_identifier(protocol.scheme)
             info.update(CFBundleIdentifier=identifier, CFBundleName=f"Expose Protocol ({protocol.scheme})",
                         CFBundleShortVersionString="0.1.0", CFBundleVersion="1",
-                        CFBundleURLTypes=[{"CFBundleTypeRole": "Shell", "CFBundleURLName": identifier,
+                        CFBundleURLTypes=[{"CFBundleTypeRole": "Viewer", "CFBundleURLName": identifier,
                                            "CFBundleURLSchemes": [protocol.scheme]}],
                         ExposeProtocolSchema=BUNDLE_FORMAT, OSAAppletShowStartupScreen=False)
             if protocol.mode == "terminal":

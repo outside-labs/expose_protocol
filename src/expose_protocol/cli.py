@@ -7,6 +7,7 @@ import sys
 from .definitions import has_control, load_protocol
 from .errors import LaunchError, ProtocolError, RequestError
 from .launchers import launch
+from .lifecycle import install, uninstall
 from .macos import build_app
 from .urls import make_url, prepare
 
@@ -18,11 +19,16 @@ def parser() -> argparse.ArgumentParser:
                             ("inspect", "Print a resolved invocation without launching."),
                             ("link", "Build a percent-encoded URL or Markdown link."),
                             ("run", "Confirm and launch a validated URL."),
-                            ("build", "Compile a new macOS URL application.")):
+                            ("build", "Compile a new macOS URL application."),
+                            ("install", "Build, install and register a per-user URL application.")):
         command = commands.add_parser(name, help=help_text)
         command.add_argument("--config", required=True, help="Explicit trusted TOML definition.")
         if name == "build":
             command.add_argument("--output", required=True, help="New .app path; parent must exist.")
+        if name == "install":
+            command.add_argument("--apps-dir", help="Owned application directory (default: ~/Applications/Expose Protocol).")
+            command.add_argument("--replace", action="store_true", help="Explicitly update an existing managed app.")
+            command.add_argument("--takeover", action="store_true", help="Explicitly replace a different current scheme handler.")
         if name in {"inspect", "run"}:
             command.add_argument("url")
         if name == "run":
@@ -31,6 +37,9 @@ def parser() -> argparse.ArgumentParser:
         if name == "link":
             command.add_argument("values", nargs="*", metavar="NAME=VALUE")
             command.add_argument("--markdown", metavar="LABEL")
+    remove = commands.add_parser("uninstall", help="Unregister and remove a managed URL application.")
+    remove.add_argument("scheme")
+    remove.add_argument("--apps-dir", help="Application directory used for installation.")
     return root
 
 
@@ -47,6 +56,9 @@ def _link_values(tokens: list[str]) -> dict[str, str]:
 def main(argv: list[str] | None = None) -> None:
     args = parser().parse_args(argv)
     try:
+        if args.command == "uninstall":
+            print(uninstall(args.scheme, directory=args.apps_dir))
+            return
         protocol = load_protocol(args.config)
         if args.command == "validate":
             print(json.dumps(protocol.to_mapping(), indent=2, ensure_ascii=True))
@@ -59,6 +71,8 @@ def main(argv: list[str] | None = None) -> None:
                 raise SystemExit(launch(protocol, args.url, yes=args.yes))
         elif args.command == "build":
             print(build_app(protocol, args.output))
+        elif args.command == "install":
+            print(install(protocol, directory=args.apps_dir, replace=args.replace, takeover=args.takeover))
         elif args.command == "link":
             url = make_url(protocol, _link_values(args.values))
             if args.markdown is not None:
