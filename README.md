@@ -73,6 +73,33 @@ quoted argument. It requests Terminal automation permission only for Terminal
 profiles. The generated app is for local use; signing for distribution and
 notarization are separate release concerns.
 
+Install, update or remove a handler:
+
+```sh
+uv run expose-protocol install --config vim.toml
+uv run expose-protocol install --config vim.toml --replace
+uv run expose-protocol uninstall vim
+```
+
+Installation builds into `~/Applications/Expose Protocol`, registers the app
+and selects it for the custom scheme. `--apps-dir` chooses another owned
+directory. An existing different handler requires explicit `--takeover`;
+installation records its bundle identifier for restoration on removal.
+Updates require `--replace`, verify the existing app and receipt, and preserve
+the previous app until registration succeeds. Failed updates restore the old
+app and default when possible. If recovery itself fails, the error identifies
+the retained backup directory. Uninstall verifies the managed identity and
+signature, unregisters, restores the recorded default if applicable, and then
+removes the app. It also works when the original profile root has been deleted.
+
+Apple's handler-selection APIs are deprecated; the current compatibility
+backend is isolated and tested on macOS. A duplicate copy of a generated app
+can affect macOS routing; installation checks both the selected bundle ID and
+application path. Registration failures report an error and attempt rollback.
+The CLI refuses symlinked install paths and unrelated apps. An interrupted
+operation can leave a scheme lock or a backup; inspect the reported path before
+removing a stale lock. Personal URL handlers are not installed by the tests.
+
 Development:
 
 ```sh
