@@ -7,6 +7,7 @@ import sys
 from .definitions import has_control, load_protocol
 from .errors import LaunchError, ProtocolError, RequestError
 from .launchers import launch
+from .macos import build_app
 from .urls import make_url, prepare
 
 
@@ -16,9 +17,12 @@ def parser() -> argparse.ArgumentParser:
     for name, help_text in (("validate", "Validate a local TOML definition."),
                             ("inspect", "Print a resolved invocation without launching."),
                             ("link", "Build a percent-encoded URL or Markdown link."),
-                            ("run", "Confirm and launch a validated URL.")):
+                            ("run", "Confirm and launch a validated URL."),
+                            ("build", "Compile a new macOS URL application.")):
         command = commands.add_parser(name, help=help_text)
         command.add_argument("--config", required=True, help="Explicit trusted TOML definition.")
+        if name == "build":
+            command.add_argument("--output", required=True, help="New .app path; parent must exist.")
         if name in {"inspect", "run"}:
             command.add_argument("url")
         if name == "run":
@@ -53,6 +57,8 @@ def main(argv: list[str] | None = None) -> None:
                 print(json.dumps(prepare(protocol, args.url).to_mapping(), indent=2, ensure_ascii=True))
             else:
                 raise SystemExit(launch(protocol, args.url, yes=args.yes))
+        elif args.command == "build":
+            print(build_app(protocol, args.output))
         elif args.command == "link":
             url = make_url(protocol, _link_values(args.values))
             if args.markdown is not None:
