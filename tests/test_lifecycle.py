@@ -275,7 +275,7 @@ class ServiceReadTests(ProtocolTestCase):
             self.skipTest("explicit opt-in on disposable macOS runner only")
         scheme = "expose-test-" + uuid.uuid4().hex
         protocol = self.protocol(scheme=scheme)
-        directory = self.root / "Applications"
+        directory = Path.home() / "Applications/Expose Protocol"
         app = install(protocol, directory=directory)
         try:
             self.assertEqual(get_handler(scheme), DefaultHandler(bundle_identifier(scheme), app))
