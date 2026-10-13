@@ -57,6 +57,22 @@ arguments; its exit status reports submission of the session. Terminal's
 configured shell must accept POSIX shell quoting. macOS may request permission
 to automate Terminal on the first Terminal launch.
 
+Build a URL application on macOS:
+
+```sh
+uv run expose-protocol build --config vim.toml --output './Vim Links.app'
+```
+
+The output path must be new and its parent must exist. The app receives a local
+ad-hoc signature and contains a validated profile snapshot and its helper code.
+It pins the current Python interpreter, which must remain installed at that
+path. Editing the original TOML file takes effect after a rebuild. Building
+does not register the app; installation and registration are separate commands.
+The bundle uses an isolated Python helper and passes each incoming URL as one
+quoted argument. It requests Terminal automation permission only for Terminal
+profiles. The generated app is for local use; signing for distribution and
+notarization are separate release concerns.
+
 Development:
 
 ```sh
