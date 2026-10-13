@@ -1,0 +1,16 @@
+# Set this executable to the absolute Python 3.14 path on your machine.
+schema = 1
+scheme = "python"
+action = "run"
+command = ["/absolute/path/to/python3.14", "-I", "repeat.py", "{count}", "{message}"]
+root = "."
+mode = "terminal"
+
+[parameters.count]
+type = "integer"
+minimum = 1
+maximum = 5
+
+[parameters.message]
+type = "choice"
+choices = ["hello", "goodbye"]
