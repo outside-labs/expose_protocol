@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 from unittest.mock import patch
 import uuid
@@ -10,6 +11,7 @@ from expose_protocol import DefinitionError, LaunchError, install, uninstall
 from expose_protocol.lifecycle import _same_app
 from expose_protocol.macos import bundle_identifier, app_scheme
 from expose_protocol.services import DefaultHandler, get_handler, register_app, unregister_app, LSREGISTER
+import expose_protocol.lifecycle as lifecycle
 from support import ProtocolTestCase
 import test_macos
 
@@ -276,7 +278,19 @@ class ServiceReadTests(ProtocolTestCase):
         scheme = "expose-test-" + uuid.uuid4().hex
         protocol = self.protocol(scheme=scheme)
         directory = self.root / "Applications"
-        app = install(protocol, directory=directory)
+        original_set = lifecycle.set_handler
+        def select_and_inspect(name, identifier):
+            original_set(name, identifier)
+            query = "import sys; from expose_protocol.services import _services; print(_services().handler(sys.argv[1])); print('Browser:', _services().handler('https'))"
+            fresh = subprocess.run([sys.executable, "-I", "-c", query, name], capture_output=True, text=True)
+            print("Fresh-process routing:", fresh.stdout.strip(), fresh.stderr.strip(), flush=True)
+            result = subprocess.run([LSREGISTER, "-dump"], capture_output=True, text=True)
+            lines = result.stdout.splitlines()
+            for index, line in enumerate(lines):
+                if identifier in line:
+                    print("Registered bundle:", "\n".join(lines[max(0, index - 12):index + 20]), flush=True)
+        with patch("expose_protocol.lifecycle.set_handler", side_effect=select_and_inspect):
+            app = install(protocol, directory=directory)
         try:
             self.assertEqual(get_handler(scheme), DefaultHandler(bundle_identifier(scheme), app))
             install(self.protocol(scheme=scheme, action="edit"), directory=directory, replace=True)
