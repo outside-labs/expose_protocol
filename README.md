@@ -3,6 +3,11 @@
 Expose locally configured programs through validated macOS URL schemes.
 Python 3.14; no runtime dependencies.
 
+Choose a protocol name, a program and its typed arguments in a local profile,
+build/install its URL app, then use the generated links in Markdown or your CLI.
+The [examples](examples/README.md) include Vim, nano and a fixed Python script;
+the [API reference](docs/API.md) covers definitions, validation and launch rules.
+
 A local TOML definition selects a fixed executable, argv template, file root,
 action and typed URL fields. For example:
 
@@ -83,7 +88,8 @@ uv run expose-protocol uninstall vim
 
 Installation builds into `~/Applications/Expose Protocol`, registers the app
 and selects it for the custom scheme. `--apps-dir` chooses another owned
-directory. An existing different handler requires explicit `--takeover`;
+directory; use a persistent Applications location, since macOS can decline
+routing from temporary storage. An existing different handler requires explicit `--takeover`;
 installation records its bundle identifier for restoration on removal.
 Updates require `--replace`, verify the existing app and receipt, and preserve
 the previous app until registration succeeds. Failed updates restore the old
@@ -105,7 +111,16 @@ Development:
 ```sh
 uv run python -m unittest discover -s tests -v
 uv build
+python scripts/check_distribution.py
 ```
+
+CI verifies core behavior and distributions on Linux and macOS. Native macOS
+checks compile/sign real apps and exercise the compiled AppleScript bridge
+with a synthetic recorder. Synthetic installation/update/removal is enabled
+only on disposable CI runners with `EXPOSE_PROTOCOL_NATIVE_LIFECYCLE=1`.
+Distribution checks build a wheel/source archive and exercise a freshly
+installed wheel from outside the checkout. Source development is independent
+of package publication.
 
 [Roadmap](https://github.com/outside-labs/expose_protocol/issues/1)
 and [Project](https://github.com/orgs/outside-labs/projects/8) track development.

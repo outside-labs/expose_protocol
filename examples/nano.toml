@@ -1,0 +1,10 @@
+schema = 1
+scheme = "nano"
+action = "open"
+command = ["/usr/bin/nano", "{file}"]
+root = "."
+mode = "terminal"
+
+[parameters.file]
+type = "path"
+must_exist = false

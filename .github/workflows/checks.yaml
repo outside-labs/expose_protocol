@@ -33,3 +33,21 @@ jobs:
       - run: uv run --frozen python -m unittest discover -s tests -v
         env:
           EXPOSE_PROTOCOL_NATIVE_LIFECYCLE: ${{ matrix.os == 'macos-latest' && '1' || '0' }}
+
+  distribution:
+    name: Distribution (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: python -m pip install 'uv==0.12.19'
+      - run: python scripts/check_distribution.py

@@ -1,0 +1,9 @@
+schema = 1
+scheme = "vim"
+action = "open"
+command = ["/usr/bin/vim", "--", "{file}"]
+root = "."
+mode = "terminal"
+
+[parameters.file]
+type = "path"
