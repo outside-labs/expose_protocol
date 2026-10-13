@@ -132,12 +132,12 @@ def app_scheme(path: str | Path) -> str:
         manifest = _manifest_data(path / "Contents/Resources/manifest.json")
         scheme = manifest["protocol"]["scheme"]
         identifier = bundle_identifier(scheme)
-        expected_types = [{"CFBundleTypeRole": "Shell", "CFBundleURLName": identifier,
-                           "CFBundleURLSchemes": [scheme]}]
+        expected_types = [[{"CFBundleTypeRole": role, "CFBundleURLName": identifier,
+                            "CFBundleURLSchemes": [scheme]}] for role in ("Viewer", "Shell")]
         if (type(info.get("ExposeProtocolSchema")) is not int
                 or info.get("ExposeProtocolSchema") != BUNDLE_FORMAT
                 or info.get("CFBundleIdentifier") != identifier
-                or info.get("CFBundleURLTypes") != expected_types
+                or info.get("CFBundleURLTypes") not in expected_types
                 or info.get("CFBundleExecutable") != "applet"
                 or not (path / "Contents/MacOS/applet").is_file()
                 or (path / "Contents/Resources/launcher.py").read_text(encoding="utf-8") != APP_HELPER):
@@ -187,7 +187,7 @@ def build_app(protocol: Protocol, output: str | Path) -> Path:
             identifier = bundle_identifier(protocol.scheme)
             info.update(CFBundleIdentifier=identifier, CFBundleName=f"Expose Protocol ({protocol.scheme})",
                         CFBundleShortVersionString="0.1.0", CFBundleVersion="1",
-                        CFBundleURLTypes=[{"CFBundleTypeRole": "Shell", "CFBundleURLName": identifier,
+                        CFBundleURLTypes=[{"CFBundleTypeRole": "Viewer", "CFBundleURLName": identifier,
                                            "CFBundleURLSchemes": [protocol.scheme]}],
                         ExposeProtocolSchema=BUNDLE_FORMAT, OSAAppletShowStartupScreen=False)
             if protocol.mode == "terminal":

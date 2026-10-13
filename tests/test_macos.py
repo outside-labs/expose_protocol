@@ -44,12 +44,12 @@ class BundleTests(ProtocolTestCase):
             info = plistlib.load(stream)
         self.assertFalse(any(key.endswith("UsageDescription") for key in info))
 
-    def test_terminal_permission_and_shell_url_role(self):
+    def test_terminal_permission_and_viewer_url_role(self):
         app = self.fake_build(protocol=self.protocol(mode="terminal"))
         with (app / "Contents/Info.plist").open("rb") as stream:
             info = plistlib.load(stream)
         self.assertEqual([key for key in info if key.endswith("UsageDescription")], ["NSAppleEventsUsageDescription"])
-        self.assertEqual(info["CFBundleURLTypes"][0]["CFBundleTypeRole"], "Shell")
+        self.assertEqual(info["CFBundleURLTypes"][0]["CFBundleTypeRole"], "Viewer")
         self.assertEqual(info["CFBundleURLTypes"][0]["CFBundleURLSchemes"], ["test-editor"])
 
     def test_build_refuses_existing_symlink_invalid_name_and_non_macos(self):
