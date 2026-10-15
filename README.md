@@ -3,6 +3,25 @@
 Expose locally configured programs through validated macOS URL schemes.
 Python 3.14; no runtime dependencies.
 
+## Install
+
+```sh
+python -m pip install expose-protocol
+expose-protocol --help
+```
+
+The examples below use `uv` from a source checkout. After installing from PyPI,
+invoke `expose-protocol` directly in place of `uv run expose-protocol`.
+
+## Releases
+
+Publish a GitHub release with a tag matching the package version, such as
+`v0.1.0`. `.github/workflows/release.yaml` tests and verifies the distributions
+before publishing to PyPI through the `pypi` environment using Trusted Publishing.
+The workflow can also be run manually against an existing release tag.
+
+## Usage
+
 Choose a protocol name, a program and its typed arguments in a local profile,
 build/install its URL app, then use the generated links in Markdown or your CLI.
 The [examples](examples/README.md) include Vim, nano and a fixed Python script;
